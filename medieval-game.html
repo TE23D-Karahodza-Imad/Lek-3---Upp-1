@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medieval Adventure</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #1a1a2e;
+            color: #e0d6c8;
+            font-family: Georgia, 'Times New Roman', serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            max-width: 700px;
+            width: 90%;
+            background-color: #16213e;
+            border: 3px solid #c9a227;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 0 30px rgba(201, 162, 39, 0.3);
+        }
+
+        h1 {
+            text-align: center;
+            color: #c9a227;
+            font-size: 2em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #subtitle {
+            text-align: center;
+            color: #8a7a5a;
+            font-style: italic;
+            margin-bottom: 30px;
+        }
+
+        #story-text {
+            font-size: 1.15em;
+            line-height: 1.7;
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #0f3460;
+            border-left: 4px solid #c9a227;
+            border-radius: 4px;
+            min-height: 80px;
+        }
+
+        #choices {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .choice-btn {
+            background-color: #1a1a2e;
+            color: #e0d6c8;
+            border: 2px solid #c9a227;
+            padding: 14px 20px;
+            font-size: 1.05em;
+            font-family: Georgia, 'Times New Roman', serif;
+            cursor: pointer;
+            border-radius: 6px;
+            text-align: left;
+            transition: all 0.2s ease;
+        }
+
+        .choice-btn:hover {
+            background-color: #c9a227;
+            color: #1a1a2e;
+            transform: translateX(6px);
+        }
+
+        #stats {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.95em;
+            color: #8a7a5a;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            color: #c9a227;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Medieval Adventure</h1>
+        <p id="subtitle">A Tale of Courage and Choice</p>
+        <div id="story-text"></div>
+        <div id="choices"></div>
+        <div id="stats">
+            <div class="stat">HP: <span class="stat-value" id="hp">10</span></div>
+            <div class="stat">Gold: <span class="stat-value" id="gold">5</span></div>
+            <div class="stat">Weapon: <span class="stat-value" id="weapon">None</span></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Player State ---
+        let player = {
+            hp: 10,
+            gold: 5,
+            weapon: "None",
+            hasShield: false,
+            hasPotion: false
+        };
+
+        // --- All Scenes ---
+        const scenes = {
+            start: {
+                text: "You wake up in a small medieval village. The air smells of smoke. A wounded messenger stumbles toward you and gasps: \"The Shadow Dragon has attacked the northern fortress... the kingdom needs a hero!\"",
+                choices: [
+                    { text: "1. Travel to the King's castle to offer your help", next: "castle" },
+                    { text: "2. Head into the Dark Forest to hunt the dragon alone", next: "forest" },
+                    { text: "3. Visit the village blacksmith to gear up first", next: "blacksmith" }
+                ]
+            },
+
+            castle: {
+                text: "You arrive at the grand castle. The King sits on his throne, worry etched on his face. \"Brave soul,\" he says, \"I need someone to retrieve the Sword of Light from the Ancient Ruins. It is the only weapon that can slay the Shadow Dragon. Will you help?\"",
+                choices: [
+                    { text: "1. \"I accept the quest, Your Majesty!\"", next: "ruins_entrance" },
+                    { text: "2. \"Can you spare some soldiers to join me?\"", next: "king_soldiers" },
+                    { text: "3. \"Give me gold for supplies first.\"", next: "king_gold" }
+                ]
+            },
+
+            king_soldiers: {
+                text: "The King shakes his head sadly. \"All my soldiers are defending the walls. You must go alone. But take this healing potion -- it may save your life.\"",
+                onEnter: function () { player.hasPotion = true; },
+                choices: [
+                    { text: "1. Thank the King and head to the Ancient Ruins", next: "ruins_entrance" },
+                    { text: "2. Stop by the blacksmith on the way", next: "blacksmith" }
+                ]
+            },
+
+            king_gold: {
+                text: "The King tosses you a pouch of gold coins. \"Take 10 gold. Spend it wisely, hero. Now go to the Ancient Ruins and find the Sword of Light!\"",
+                onEnter: function () { player.gold += 10; },
+                choices: [
+                    { text: "1. Head straight to the Ancient Ruins", next: "ruins_entrance" },
+                    { text: "2. Visit the blacksmith to buy equipment", next: "blacksmith" }
+                ]
+            },
+
+            blacksmith: {
+                text: "The blacksmith, a burly man with soot-covered arms, greets you. \"Looking to gear up, eh? I've got a sturdy Iron Sword (5 gold), a Wooden Shield (3 gold), or I can share a rumor about a secret path... for free.\"",
+                choices: [
+                    { text: "1. Buy the Iron Sword (5 gold)", next: "buy_sword" },
+                    { text: "2. Buy the Wooden Shield (3 gold)", next: "buy_shield" },
+                    { text: "3. Ask about the secret path", next: "secret_path_info" }
+                ]
+            },
+
+            buy_sword: {
+                text: player.gold >= 5
+                    ? "" // handled dynamically
+                    : "",
+                onEnter: function () {
+                    if (player.gold >= 5) {
+                        player.gold -= 5;
+                        player.weapon = "Iron Sword";
+                        this.text = "You hand over 5 gold and receive a sharp Iron Sword. It feels well-balanced in your grip. The blacksmith nods approvingly. \"That'll cut through bone and scale alike.\"";
+                    } else {
+                        this.text = "You reach for your coin pouch but don't have enough gold. The blacksmith shrugs. \"Come back when you can pay, friend.\"";
+                    }
+                },
+                choices: [
+                    { text: "1. Head to the Dark Forest", next: "forest" },
+                    { text: "2. Travel to the Ancient Ruins", next: "ruins_entrance" },
+                    { text: "3. Go to the King's castle", next: "castle" }
+                ]
+            },
+
+            buy_shield: {
+                text: "",
+                onEnter: function () {
+                    if (player.gold >= 3) {
+                        player.gold -= 3;
+                        player.hasShield = true;
+                        this.text = "You purchase a sturdy Wooden Shield. It's reinforced with iron bands. \"That'll block a dragon's claw,\" the blacksmith says with a grin.";
+                    } else {
+                        this.text = "You don't have enough gold for the shield. The blacksmith shakes his head. \"No charity here, friend.\"";
+                    }
+                },
+                choices: [
+                    { text: "1. Head to the Dark Forest", next: "forest" },
+                    { text: "2. Travel to the Ancient Ruins", next: "ruins_entrance" },
+                    { text: "3. Go to the King's castle", next: "castle" }
+                ]
+            },
+
+            secret_path_info: {
+                text: "The blacksmith leans in and whispers: \"There's a hidden cave behind the waterfall east of the ruins. Legend says it leads straight to the dragon's treasure hoard. But be warned -- it's guarded by traps.\" He winks.",
+                choices: [
+                    { text: "1. Head to the Ancient Ruins (and look for the cave)", next: "ruins_entrance" },
+                    { text: "2. Buy something before leaving", next: "blacksmith" },
+                    { text: "3. Go straight to the Dark Forest", next: "forest" }
+                ]
+            },
+
+            forest: {
+                text: "The Dark Forest is thick with twisted trees and eerie silence. Suddenly, you hear a low growl. A pair of glowing red eyes stare at you from the shadows -- a dire wolf blocks your path!",
+                choices: [
+                    { text: "1. Fight the dire wolf!", next: "wolf_fight" },
+                    { text: "2. Try to sneak past it quietly", next: "wolf_sneak" },
+                    { text: "3. Retreat back to the village", next: "start" }
+                ]
+            },
+
+            wolf_fight: {
+                text: "",
+                onEnter: function () {
+                    if (player.weapon !== "None") {
+                        this.text = "You draw your " + player.weapon + " and charge! The wolf lunges, but you strike true. After a fierce battle, the beast falls. You find 3 gold coins in an old pouch nearby.";
+                        player.gold += 3;
+                        player.hp -= 2;
+                    } else {
+                        this.text = "You have no weapon! You fight the wolf with your bare fists. You manage to drive it away, but you're badly wounded.";
+                        player.hp -= 5;
+                    }
+                },
+                choices: [
+                    { text: "1. Press deeper into the forest", next: "forest_deep" },
+                    { text: "2. Head to the Ancient Ruins instead", next: "ruins_entrance" }
+                ]
+            },
+
+            wolf_sneak: {
+                text: "",
+                onEnter: function () {
+                    let success = Math.random() > 0.4;
+                    if (success) {
+                        this.text = "You hold your breath and creep past the wolf. It sniffs the air but doesn't notice you. You slip through the trees safely!";
+                    } else {
+                        this.text = "You step on a twig -- SNAP! The wolf pounces! You barely escape, but it claws your arm before you get away.";
+                        player.hp -= 3;
+                    }
+                },
+                choices: [
+                    { text: "1. Continue deeper into the forest", next: "forest_deep" },
+                    { text: "2. Change course to the Ancient Ruins", next: "ruins_entrance" }
+                ]
+            },
+
+            forest_deep: {
+                text: "Deep in the forest, you find an old hermit sitting by a campfire. \"Traveler,\" he says, \"I can heal your wounds or tell you the dragon's weakness. Choose wisely.\"",
+                choices: [
+                    { text: "1. Ask to be healed", next: "hermit_heal" },
+                    { text: "2. Learn the dragon's weakness", next: "hermit_secret" },
+                    { text: "3. Ignore him and continue north", next: "dragon_lair" }
+                ]
+            },
+
+            hermit_heal: {
+                text: "The hermit places his hands on you. A warm glow surrounds your body and your wounds close. \"Go well, hero. The dragon awaits.\"",
+                onEnter: function () { player.hp = 10; },
+                choices: [
+                    { text: "1. Head to the dragon's lair", next: "dragon_lair" },
+                    { text: "2. Go find the Sword of Light in the ruins first", next: "ruins_entrance" }
+                ]
+            },
+
+            hermit_secret: {
+                text: "\"The Shadow Dragon fears light and fire combined,\" the hermit whispers. \"The Sword of Light in the Ancient Ruins can channel sunlight into a devastating beam. Without it, you cannot win.\"",
+                choices: [
+                    { text: "1. Rush to the Ancient Ruins to find the sword", next: "ruins_entrance" },
+                    { text: "2. Fight the dragon anyway -- how hard can it be?", next: "dragon_lair" }
+                ]
+            },
+
+            ruins_entrance: {
+                text: "You stand before the Ancient Ruins -- crumbling stone walls covered in moss and strange glowing runes. The entrance is a dark archway leading underground. You hear the faint hum of magic within.",
+                choices: [
+                    { text: "1. Enter through the main archway", next: "ruins_hall" },
+                    { text: "2. Look for the hidden cave behind the waterfall", next: "secret_cave" },
+                    { text: "3. Turn back -- this place is too dangerous", next: "forest" }
+                ]
+            },
+
+            ruins_hall: {
+                text: "Inside, the ruins are lit by glowing crystals on the walls. You enter a grand hall with two doors: one marked with a sun symbol, the other with a skull.",
+                choices: [
+                    { text: "1. Open the Sun door", next: "sun_room" },
+                    { text: "2. Open the Skull door", next: "skull_room" },
+                    { text: "3. Inspect the crystals on the walls", next: "crystal_puzzle" }
+                ]
+            },
+
+            sun_room: {
+                text: "Bright golden light fills the room! On a pedestal in the center rests the legendary Sword of Light. Its blade glows with pure radiance. As you reach for it, a stone guardian awakens!",
+                choices: [
+                    { text: "1. Fight the guardian!", next: "guardian_fight" },
+                    { text: "2. Grab the sword and run!", next: "grab_and_run" }
+                ]
+            },
+
+            guardian_fight: {
+                text: "",
+                onEnter: function () {
+                    if (player.weapon !== "None") {
+                        this.text = "The stone guardian swings its massive fist! You dodge and strike back with your " + player.weapon + ". After a hard battle, the guardian crumbles to dust. You claim the Sword of Light!";
+                        player.weapon = "Sword of Light";
+                        player.hp -= 2;
+                    } else {
+                        this.text = "The stone guardian attacks! Without a proper weapon, you fight desperately. You manage to topple it by pushing a pillar onto it, but you're badly hurt. You claim the Sword of Light!";
+                        player.weapon = "Sword of Light";
+                        player.hp -= 5;
+                    }
+                },
+                choices: [
+                    { text: "1. Go face the Shadow Dragon!", next: "dragon_lair" },
+                    { text: "2. Use the healing potion first (if you have one)", next: "use_potion_then_dragon" }
+                ]
+            },
+
+            grab_and_run: {
+                text: "You snatch the Sword of Light and sprint for the exit! The guardian's fist crashes into the ground behind you. Rocks fall as you dive through the archway -- barely making it out alive!",
+                onEnter: function () {
+                    player.weapon = "Sword of Light";
+                    player.hp -= 1;
+                },
+                choices: [
+                    { text: "1. Head to the dragon's lair!", next: "dragon_lair" },
+                    { text: "2. Rest and prepare before fighting the dragon", next: "rest_camp" }
+                ]
+            },
+
+            skull_room: {
+                text: "The room is dark and cold. A treasure chest sits in the corner, but the floor is covered in suspicious tiles. This looks like a trap...",
+                choices: [
+                    { text: "1. Carefully cross to the chest", next: "trap_careful" },
+                    { text: "2. Throw a rock onto the tiles first", next: "trap_smart" },
+                    { text: "3. Leave and try the other door", next: "sun_room" }
+                ]
+            },
+
+            trap_careful: {
+                text: "",
+                onEnter: function () {
+                    let lucky = Math.random() > 0.5;
+                    if (lucky) {
+                        this.text = "You step carefully... and make it! The chest contains 8 gold coins and a healing potion!";
+                        player.gold += 8;
+                        player.hasPotion = true;
+                    } else {
+                        this.text = "CLICK. A tile sinks under your foot. Arrows shoot from the walls! You dodge most of them but take a hit.";
+                        player.hp -= 4;
+                    }
+                },
+                choices: [
+                    { text: "1. Go to the Sun door room", next: "sun_room" },
+                    { text: "2. Leave the ruins", next: "ruins_entrance" }
+                ]
+            },
+
+            trap_smart: {
+                text: "You throw a rock onto the tiles. WHOOSH -- arrows fly across the room from hidden slots in the walls! After they stop, you safely walk across and open the chest. Inside: 8 gold and a healing potion!",
+                onEnter: function () {
+                    player.gold += 8;
+                    player.hasPotion = true;
+                },
+                choices: [
+                    { text: "1. Now try the Sun door", next: "sun_room" },
+                    { text: "2. Leave the ruins and find the dragon", next: "dragon_lair" }
+                ]
+            },
+
+            crystal_puzzle: {
+                text: "The crystals form a pattern on the wall. You notice they can be pressed in a sequence. You try pressing them in order of brightness... A hidden door slides open, revealing a secret armory! You find a fire-resistant cloak.",
+                onEnter: function () { player.hasShield = true; },
+                choices: [
+                    { text: "1. Enter the Sun door", next: "sun_room" },
+                    { text: "2. Enter the Skull door", next: "skull_room" }
+                ]
+            },
+
+            secret_cave: {
+                text: "Behind the roaring waterfall, you find a narrow cave entrance. Inside, piles of gold and jewels glitter in the dim light -- the dragon's secondary hoard! But a sleeping troll guards it.",
+                choices: [
+                    { text: "1. Attack the troll while it sleeps", next: "troll_attack" },
+                    { text: "2. Quietly steal some gold and leave", next: "troll_steal" },
+                    { text: "3. Go back to the main ruins entrance", next: "ruins_entrance" }
+                ]
+            },
+
+            troll_attack: {
+                text: "",
+                onEnter: function () {
+                    if (player.weapon !== "None") {
+                        this.text = "You strike the troll with your " + player.weapon + "! It wakes with a roar but you finish it quickly. You take 10 gold from the hoard!";
+                        player.gold += 10;
+                    } else {
+                        this.text = "You punch the troll. It wakes up ANGRY. It throws you against the cave wall before you escape!";
+                        player.hp -= 4;
+                    }
+                },
+                choices: [
+                    { text: "1. Enter the ruins through the main entrance", next: "ruins_hall" },
+                    { text: "2. Go fight the dragon now", next: "dragon_lair" }
+                ]
+            },
+
+            troll_steal: {
+                text: "You tiptoe past the snoring troll and grab a handful of gold coins. You sneak back out without waking it. Nice!",
+                onEnter: function () { player.gold += 6; },
+                choices: [
+                    { text: "1. Enter the ruins properly", next: "ruins_hall" },
+                    { text: "2. Head to the dragon's lair", next: "dragon_lair" }
+                ]
+            },
+
+            rest_camp: {
+                text: "You set up a small camp and rest by a fire. The warmth restores some of your strength.",
+                onEnter: function () { player.hp = Math.min(player.hp + 3, 10); },
+                choices: [
+                    { text: "1. Time to face the dragon!", next: "dragon_lair" }
+                ]
+            },
+
+            use_potion_then_dragon: {
+                text: "",
+                onEnter: function () {
+                    if (player.hasPotion) {
+                        player.hp = 10;
+                        player.hasPotion = false;
+                        this.text = "You drink the healing potion. Warmth floods through your body as your wounds heal completely. You feel ready to face the dragon!";
+                    } else {
+                        this.text = "You search your pack but you don't have a healing potion. No time to waste -- the dragon awaits!";
+                    }
+                },
+                choices: [
+                    { text: "1. March to the dragon's lair!", next: "dragon_lair" }
+                ]
+            },
+
+            dragon_lair: {
+                text: "",
+                onEnter: function () {
+                    this.text = "You climb the scorched mountain path to the dragon's lair. The Shadow Dragon emerges from its cave -- enormous, dark as midnight, with eyes like burning coals. Smoke rises from its nostrils.\n\nYour HP: " + player.hp + " | Weapon: " + player.weapon;
+                    if (player.hp <= 0) {
+                        this.text = "You are too wounded to fight... you collapse before reaching the dragon.";
+                        this.choices = [{ text: "1. Start a new adventure", next: "restart" }];
+                        return;
+                    }
+                },
+                choices: [
+                    { text: "1. Charge and attack with everything you have!", next: "dragon_fight_charge" },
+                    { text: "2. Try to find a weak spot first", next: "dragon_fight_smart" },
+                    { text: "3. Try to reason with the dragon", next: "dragon_talk" }
+                ]
+            },
+
+            dragon_fight_charge: {
+                text: "",
+                onEnter: function () {
+                    if (player.weapon === "Sword of Light") {
+                        this.text = "You raise the Sword of Light high -- it blazes with golden fire! The Shadow Dragon recoils in fear. You charge forward and drive the blade deep into its chest. The dragon lets out a final, thunderous roar and dissolves into shadow and smoke.\n\nYOU ARE VICTORIOUS! The kingdom is saved!";
+                    } else if (player.weapon !== "None") {
+                        this.text = "You attack with your " + player.weapon + ", but the dragon's scales are too tough! The blade barely scratches it. The dragon swipes its tail and sends you flying. You survive... barely.";
+                        player.hp -= 6;
+                        if (player.hp <= 0) {
+                            this.text += "\n\nYour wounds are too severe. The world goes dark...";
+                        }
+                    } else {
+                        this.text = "You charge at the dragon with your bare fists. The dragon looks at you, almost amused, then breathes a wall of dark fire. You don't stand a chance without a weapon.\n\nYou have fallen.";
+                        player.hp = 0;
+                    }
+                },
+                choices: function () {
+                    if (player.weapon === "Sword of Light") {
+                        return [{ text: "1. Celebrate your victory!", next: "victory" }];
+                    } else if (player.hp <= 0) {
+                        return [{ text: "1. Start a new adventure", next: "restart" }];
+                    } else {
+                        return [
+                            { text: "1. Retreat and find the Sword of Light", next: "ruins_entrance" },
+                            { text: "2. Try a different approach", next: "dragon_lair" }
+                        ];
+                    }
+                }
+            },
+
+            dragon_fight_smart: {
+                text: "",
+                onEnter: function () {
+                    if (player.weapon === "Sword of Light") {
+                        this.text = "You circle the dragon carefully, watching its movements. You spot it -- an unprotected spot under its left wing! You dash forward with the Sword of Light and strike! The blade erupts in blinding radiance. The dragon screams and collapses.\n\nA LEGENDARY VICTORY! You barely took a scratch!";
+                    } else {
+                        this.text = "You study the dragon and notice a weak spot under its wing. But without the Sword of Light, your attacks can't pierce its magical shadow armor. The dragon notices you and attacks!";
+                        player.hp -= 4;
+                        if (player.hp <= 0) {
+                            this.text += "\n\nThe dragon's claws find their mark. Your quest ends here...";
+                        }
+                    }
+                },
+                choices: function () {
+                    if (player.weapon === "Sword of Light") {
+                        return [{ text: "1. Claim your legendary victory!", next: "victory" }];
+                    } else if (player.hp <= 0) {
+                        return [{ text: "1. Start a new adventure", next: "restart" }];
+                    } else {
+                        return [
+                            { text: "1. Retreat! Find the Sword of Light!", next: "ruins_entrance" },
+                            { text: "2. Try talking to the dragon", next: "dragon_talk" }
+                        ];
+                    }
+                }
+            },
+
+            dragon_talk: {
+                text: "\"FOOLISH MORTAL,\" the dragon booms. \"Why should I not burn you where you stand?\" You notice the dragon seems... tired. Ancient. Perhaps there's more to this story.",
+                choices: [
+                    { text: "1. \"What do you truly want, dragon?\"", next: "dragon_peace" },
+                    { text: "2. \"I'm here to end you!\" (Attack!)", next: "dragon_fight_charge" },
+                    { text: "3. \"I'll leave and never return.\"", next: "dragon_leave" }
+                ]
+            },
+
+            dragon_peace: {
+                text: "The dragon pauses. Its fierce eyes soften. \"I have guarded this mountain for a thousand years. I attacked the fortress because they built too close to my nest... my eggs. I just want to be left in peace.\"\n\nYou realize this conflict could end without bloodshed.",
+                choices: [
+                    { text: "1. Promise to tell the King to leave the dragon alone", next: "peace_ending" },
+                    { text: "2. \"I'm sorry, but I must slay you.\" (Attack)", next: "dragon_fight_charge" }
+                ]
+            },
+
+            peace_ending: {
+                text: "You return to the King and explain the situation. After much debate, the kingdom agrees to move the fortress away from the dragon's nesting ground. The dragon keeps the peace.\n\nYou are hailed not as a dragon slayer, but as a PEACEMAKER -- perhaps an even greater honor.\n\n--- THE PEACEMAKER ENDING ---",
+                choices: [
+                    { text: "1. Play again", next: "restart" }
+                ]
+            },
+
+            dragon_leave: {
+                text: "You turn and walk away. The dragon watches you go but does not attack. You return to the village, haunted by the knowledge that the dragon still threatens the kingdom. Perhaps another hero will finish what you could not.\n\n--- THE COWARD'S ENDING ---",
+                choices: [
+                    { text: "1. Try again with more courage", next: "restart" }
+                ]
+            },
+
+            victory: {
+                text: "The kingdom erupts in celebration! The King awards you a chest of gold, a title of nobility, and a place in the Hall of Heroes. Bards sing songs of your bravery for generations.\n\nYou are SIR DRAGONBANE, savior of the realm!\n\n--- VICTORY! ---\n\nFinal Stats: HP " + player.hp + " | Gold: " + player.gold + " | Weapon: " + player.weapon,
+                onEnter: function () {
+                    this.text = "The kingdom erupts in celebration! The King awards you a chest of gold, a title of nobility, and a place in the Hall of Heroes. Bards sing songs of your bravery for generations.\n\nYou are SIR DRAGONBANE, savior of the realm!\n\n--- VICTORY! ---\n\nFinal Stats: HP " + player.hp + " | Gold: " + player.gold + " | Weapon: " + player.weapon;
+                },
+                choices: [
+                    { text: "1. Play again!", next: "restart" }
+                ]
+            },
+
+            restart: {
+                text: "",
+                onEnter: function () {
+                    player.hp = 10;
+                    player.gold = 5;
+                    player.weapon = "None";
+                    player.hasShield = false;
+                    player.hasPotion = false;
+                },
+                choices: [],
+                redirect: "start"
+            }
+        };
+
+        // --- Game Engine ---
+        function updateStats() {
+            document.getElementById("hp").textContent = player.hp;
+            document.getElementById("gold").textContent = player.gold;
+            document.getElementById("weapon").textContent = player.weapon;
+        }
+
+        function loadScene(sceneName) {
+            let scene = scenes[sceneName];
+            if (!scene) {
+                console.error("Scene not found:", sceneName);
+                return;
+            }
+
+            // Run onEnter logic
+            if (scene.onEnter) {
+                scene.onEnter.call(scene);
+            }
+
+            // Handle redirects (used for restart)
+            if (scene.redirect) {
+                loadScene(scene.redirect);
+                return;
+            }
+
+            // Check if player is dead
+            if (player.hp <= 0 && sceneName !== "dragon_fight_charge" && sceneName !== "dragon_fight_smart" && sceneName !== "dragon_lair") {
+                document.getElementById("story-text").textContent = scene.text + "\n\nYou have fallen... your adventure ends here.";
+                let choicesDiv = document.getElementById("choices");
+                choicesDiv.innerHTML = "";
+                let btn = document.createElement("button");
+                btn.className = "choice-btn";
+                btn.textContent = "1. Start a new adventure";
+                btn.addEventListener("click", function () { loadScene("restart"); });
+                choicesDiv.appendChild(btn);
+                updateStats();
+                return;
+            }
+
+            // Display story text
+            document.getElementById("story-text").textContent = scene.text;
+
+            // Display choices
+            let choicesDiv = document.getElementById("choices");
+            choicesDiv.innerHTML = "";
+
+            let choices = typeof scene.choices === "function" ? scene.choices() : scene.choices;
+
+            choices.forEach(function (choice) {
+                let btn = document.createElement("button");
+                btn.className = "choice-btn";
+                btn.textContent = choice.text;
+                btn.addEventListener("click", function () {
+                    loadScene(choice.next);
+                });
+                choicesDiv.appendChild(btn);
+            });
+
+            updateStats();
+        }
+
+        // --- Keyboard Support: Press 1, 2, or 3 to choose ---
+        document.addEventListener("keydown", function (e) {
+            let key = parseInt(e.key);
+            if (key >= 1 && key <= 3) {
+                let buttons = document.querySelectorAll(".choice-btn");
+                if (buttons[key - 1]) {
+                    buttons[key - 1].click();
+                }
+            }
+        });
+
+        // --- Start the game ---
+        loadScene("start");
+    </script>
+</body>
+</html>
